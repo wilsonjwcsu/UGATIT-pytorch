@@ -1,4 +1,5 @@
 import torch.utils.data as data
+import numpy as np
 
 from PIL import Image
 
@@ -92,7 +93,9 @@ def pil_loader(path):
     # open path as file to avoid ResourceWarning (https://github.com/python-pillow/Pillow/issues/835)
     with open(path, 'rb') as f:
         img = Image.open(f)
-        return img.convert('RGB')
+        img = img.convert('RGB')
+        img = np.array(img)
+        return img
 
 
 def default_loader(path):

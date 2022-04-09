@@ -85,15 +85,15 @@ class UGATIT(object) :
     def build_model(self):
         """ DataLoader """
         train_transform = transforms.Compose([
+            transforms.ToTensor(),
             transforms.RandomHorizontalFlip(),
             transforms.Resize((self.img_size + 30, self.img_size+30)),
             transforms.RandomCrop(self.img_size),
-            transforms.ToTensor(),
             transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))
         ])
         test_transform = transforms.Compose([
-            transforms.Resize((self.img_size, self.img_size)),
             transforms.ToTensor(),
+            transforms.Resize((self.img_size, self.img_size)),
             transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))
         ])
 
