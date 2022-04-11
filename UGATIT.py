@@ -89,30 +89,26 @@ class UGATIT(object) :
             transforms.RandomHorizontalFlip(),
             transforms.Resize((self.img_size + 30, self.img_size+30)),
             transforms.RandomCrop(self.img_size),
-            transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))
+            transforms.Normalize(mean=(0.5, 0.5), std=(0.5, 0.5))
         ])
         test_transform = transforms.Compose([
             transforms.ToTensor(),
             transforms.Resize((self.img_size, self.img_size)),
-            transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))
+            transforms.Normalize(mean=(0.5, 0.5), std=(0.5, 0.5))
         ])
 
-        self.trainA = ImageFolder(os.path.join('dataset', self.dataset, 'trainA'), train_transform)
-        self.trainB = ImageFolder(os.path.join('dataset', self.dataset, 'trainB'), train_transform)
-        self.testA = ImageFolder(os.path.join('dataset', self.dataset, 'testA'), test_transform)
-        self.testB = ImageFolder(os.path.join('dataset', self.dataset, 'testB'), test_transform)
-        self.trainA_loader = DataLoader(self.trainA, batch_size=self.batch_size, shuffle=True)
-        self.trainB_loader = DataLoader(self.trainB, batch_size=self.batch_size, shuffle=True)
-        self.testA_loader = DataLoader(self.testA, batch_size=1, shuffle=False)
-        self.testB_loader = DataLoader(self.testB, batch_size=1, shuffle=False)
+        self.trainFolder = ImageFolder(os.path.join('dataset', self.dataset, 'train'), train_transform)
+        self.testFolder = ImageFolder(os.path.join('dataset', self.dataset, 'test'), test_transform)
+        self.train_loader = DataLoader(self.trainFolder, batch_size=self.batch_size, shuffle=True)
+        self.test_loader = DataLoader(self.testFolder, batch_size=1, shuffle=False)
 
         """ Define Generator, Discriminator """
-        self.genA2B = ResnetGenerator(input_nc=3, output_nc=3, ngf=self.ch, n_blocks=self.n_res, img_size=self.img_size, light=self.light).to(self.device)
-        self.genB2A = ResnetGenerator(input_nc=3, output_nc=3, ngf=self.ch, n_blocks=self.n_res, img_size=self.img_size, light=self.light).to(self.device)
-        self.disGA = Discriminator(input_nc=3, ndf=self.ch, n_layers=7).to(self.device)
-        self.disGB = Discriminator(input_nc=3, ndf=self.ch, n_layers=7).to(self.device)
-        self.disLA = Discriminator(input_nc=3, ndf=self.ch, n_layers=5).to(self.device)
-        self.disLB = Discriminator(input_nc=3, ndf=self.ch, n_layers=5).to(self.device)
+        self.genA2B = ResnetGenerator(input_nc=1, output_nc=1, ngf=self.ch, n_blocks=self.n_res, img_size=self.img_size, light=self.light).to(self.device)
+        self.genB2A = ResnetGenerator(input_nc=1, output_nc=1, ngf=self.ch, n_blocks=self.n_res, img_size=self.img_size, light=self.light).to(self.device)
+        self.disGA = Discriminator(input_nc=1, ndf=self.ch, n_layers=7).to(self.device)
+        self.disGB = Discriminator(input_nc=1, ndf=self.ch, n_layers=7).to(self.device)
+        self.disLA = Discriminator(input_nc=1, ndf=self.ch, n_layers=5).to(self.device)
+        self.disLB = Discriminator(input_nc=1, ndf=self.ch, n_layers=5).to(self.device)
 
         """ Define Loss """
         self.L1_loss = nn.L1Loss().to(self.device)
@@ -128,7 +124,7 @@ class UGATIT(object) :
 
     def train(self):
         self.genA2B.train(), self.genB2A.train(), self.disGA.train(), self.disGB.train(), self.disLA.train(), self.disLB.train()
-
+        
         start_iter = 1
         if self.resume:
             model_list = glob(os.path.join(self.result_dir, self.dataset, 'model', '*.pt'))
@@ -140,7 +136,7 @@ class UGATIT(object) :
                 if self.decay_flag and start_iter > (self.iteration // 2):
                     self.G_optim.param_groups[0]['lr'] -= (self.lr / (self.iteration // 2)) * (start_iter - self.iteration // 2)
                     self.D_optim.param_groups[0]['lr'] -= (self.lr / (self.iteration // 2)) * (start_iter - self.iteration // 2)
-
+        
         # training loop
         print('training start !')
         start_time = time.time()
@@ -150,16 +146,13 @@ class UGATIT(object) :
                 self.D_optim.param_groups[0]['lr'] -= (self.lr / (self.iteration // 2))
 
             try:
-                real_A, _ = trainA_iter.next()
+                real_stack, _ = train_iter.next()
             except:
-                trainA_iter = iter(self.trainA_loader)
-                real_A, _ = trainA_iter.next()
+                train_iter = iter(self.train_loader)
+                real_stack, _ = train_iter.next()
 
-            try:
-                real_B, _ = trainB_iter.next()
-            except:
-                trainB_iter = iter(self.trainB_loader)
-                real_B, _ = trainB_iter.next()
+            real_A = real_stack[:,0:1,:,:]
+            real_B = real_stack[:,1:2,:,:]
 
             real_A, real_B = real_A.to(self.device), real_B.to(self.device)
 
@@ -252,16 +245,14 @@ class UGATIT(object) :
                     self.genA2B.eval(), self.genB2A.eval(), self.disGA.eval(), self.disGB.eval(), self.disLA.eval(), self.disLB.eval()
                     for _ in range(train_sample_num):
                         try:
-                            real_A, _ = trainA_iter.next()
+                            real_stack, _ = train_iter.next()
                         except:
-                            trainA_iter = iter(self.trainA_loader)
-                            real_A, _ = trainA_iter.next()
+                            train_iter = iter(self.train_loader)
+                            real_stack, _ = train_iter.next()
 
-                        try:
-                            real_B, _ = trainB_iter.next()
-                        except:
-                            trainB_iter = iter(self.trainB_loader)
-                            real_B, _ = trainB_iter.next()
+                        real_A = real_stack[:,0:1,:,:]
+                        real_B = real_stack[:,1:2,:,:]
+
                         real_A, real_B = real_A.to(self.device), real_B.to(self.device)
 
                         fake_A2B, _, fake_A2B_heatmap = self.genA2B(real_A)
@@ -291,16 +282,14 @@ class UGATIT(object) :
 
                     for _ in range(test_sample_num):
                         try:
-                            real_A, _ = testA_iter.next()
+                            real_stack, _ = test_iter.next()
                         except:
-                            testA_iter = iter(self.testA_loader)
-                            real_A, _ = testA_iter.next()
+                            test_iter = iter(self.test_loader)
+                            real_stack, _ = test_iter.next()
 
-                        try:
-                            real_B, _ = testB_iter.next()
-                        except:
-                            testB_iter = iter(self.testB_loader)
-                            real_B, _ = testB_iter.next()
+                        real_A = real_stack[:,0:1,:,:]
+                        real_B = real_stack[:,1:2,:,:]
+
                         real_A, real_B = real_A.to(self.device), real_B.to(self.device)
 
                         fake_A2B, _, fake_A2B_heatmap = self.genA2B(real_A)

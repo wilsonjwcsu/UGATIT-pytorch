@@ -95,7 +95,14 @@ def pil_loader(path):
         img = Image.open(f)
         img = img.convert('RGB')
         img = np.array(img)
-        return img
+        img = img[:,:,1]    # assume single channel for now
+        ny,nx = img.shape
+        imgA = img[:,0:nx//2] # left half of image is domain A
+        imgB = img[:,nx//2::] # right half of image is domain B
+        ny,nx = imgA.shape
+        ny,nx = imgB.shape
+        stacked = np.stack((imgA,imgB),axis=-1) # create ny x nx x 2 stack
+        return stacked
 
 
 def default_loader(path):

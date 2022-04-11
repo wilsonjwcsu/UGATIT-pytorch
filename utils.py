@@ -63,4 +63,8 @@ def tensor2numpy(x):
     return x.detach().cpu().numpy().transpose(1,2,0)
 
 def RGB2BGR(x):
+    ny,nx,nc = x.shape
+    if nc==1:
+        x = np.concatenate((x,x,x),2)
+
     return cv2.cvtColor(x, cv2.COLOR_RGB2BGR)
