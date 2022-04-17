@@ -34,6 +34,7 @@ class UGATIT(object) :
         self.cycle_weight = args.cycle_weight
         self.identity_weight = args.identity_weight
         self.cam_weight = args.cam_weight
+        self.pix2pix_weight = args.pix2pix_weight
 
         """ Generator """
         self.n_res = args.n_res
@@ -77,6 +78,7 @@ class UGATIT(object) :
         print("# cycle_weight : ", self.cycle_weight)
         print("# identity_weight : ", self.identity_weight)
         print("# cam_weight : ", self.cam_weight)
+        print("# pix2pix_weight : ", self.pix2pix_weight)
 
     ##################################################################################
     # Model
@@ -223,8 +225,11 @@ class UGATIT(object) :
             G_cam_loss_A = self.BCE_loss(fake_B2A_cam_logit, torch.ones_like(fake_B2A_cam_logit).to(self.device)) + self.BCE_loss(fake_A2A_cam_logit, torch.zeros_like(fake_A2A_cam_logit).to(self.device))
             G_cam_loss_B = self.BCE_loss(fake_A2B_cam_logit, torch.ones_like(fake_A2B_cam_logit).to(self.device)) + self.BCE_loss(fake_B2B_cam_logit, torch.zeros_like(fake_B2B_cam_logit).to(self.device))
 
-            G_loss_A =  self.adv_weight * (G_ad_loss_GA + G_ad_cam_loss_GA + G_ad_loss_LA + G_ad_cam_loss_LA) + self.cycle_weight * G_recon_loss_A + self.identity_weight * G_identity_loss_A + self.cam_weight * G_cam_loss_A
-            G_loss_B = self.adv_weight * (G_ad_loss_GB + G_ad_cam_loss_GB + G_ad_loss_LB + G_ad_cam_loss_LB) + self.cycle_weight * G_recon_loss_B + self.identity_weight * G_identity_loss_B + self.cam_weight * G_cam_loss_B
+            G_pix2pix_loss_A = self.L1_loss(fake_A2B, real_B)
+            G_pix2pix_loss_B = self.L1_loss(fake_B2A, real_A)
+
+            G_loss_A =  self.adv_weight * (G_ad_loss_GA + G_ad_cam_loss_GA + G_ad_loss_LA + G_ad_cam_loss_LA) + self.cycle_weight * G_recon_loss_A + self.identity_weight * G_identity_loss_A + self.cam_weight * G_cam_loss_A + self.pix2pix_weight * G_pix2pix_loss_A
+            G_loss_B = self.adv_weight * (G_ad_loss_GB + G_ad_cam_loss_GB + G_ad_loss_LB + G_ad_cam_loss_LB) + self.cycle_weight * G_recon_loss_B + self.identity_weight * G_identity_loss_B + self.cam_weight * G_cam_loss_B + self.pix2pix_weight * G_pix2pix_loss_B
 
             Generator_loss = G_loss_A + G_loss_B
             Generator_loss.backward()
