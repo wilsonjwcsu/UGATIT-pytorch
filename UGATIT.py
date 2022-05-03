@@ -167,14 +167,14 @@ class UGATIT(object) :
             fake_A2B, _, _ = self.genA2B(real_A)
             fake_B2A, _, _ = self.genB2A(real_B)
 
-            real_GA_logit, real_GA_cam_logit, real_GA_heatmap = self.disGA(real_A)
+            real_GA_logit, real_GA_cam_logit, _ = self.disGA(real_A)
             real_LA_logit, real_LA_cam_logit, _ = self.disLA(real_A)
-            real_GB_logit, real_GB_cam_logit, real_GB_heatmap = self.disGB(real_B)
+            real_GB_logit, real_GB_cam_logit, _ = self.disGB(real_B)
             real_LB_logit, real_LB_cam_logit, _ = self.disLB(real_B)
 
-            fake_GA_logit, fake_GA_cam_logit, fake_GA_heatmap = self.disGA(fake_B2A)
+            fake_GA_logit, fake_GA_cam_logit, _ = self.disGA(fake_B2A)
             fake_LA_logit, fake_LA_cam_logit, _ = self.disLA(fake_B2A)
-            fake_GB_logit, fake_GB_cam_logit, fake_GB_heatmap = self.disGB(fake_A2B)
+            fake_GB_logit, fake_GB_cam_logit, _ = self.disGB(fake_A2B)
             fake_LB_logit, fake_LB_cam_logit, _ = self.disLB(fake_A2B)
 
             D_ad_loss_GA = self.MSE_loss(real_GA_logit, torch.ones_like(real_GA_logit).to(self.device)) + self.MSE_loss(fake_GA_logit, torch.zeros_like(fake_GA_logit).to(self.device))
@@ -190,24 +190,17 @@ class UGATIT(object) :
             D_loss_B = self.adv_weight * (D_ad_loss_GB + D_ad_cam_loss_GB + D_ad_loss_LB + D_ad_cam_loss_LB)
 
             Discriminator_loss = D_loss_A + D_loss_B
-            Discriminator_loss.backward(retain_graph=True)
-
-            # G paired CAM matching loss
-            G_paired_cam_loss = self.paired_cam_weight*(self.MSE_loss(real_GA_heatmap.detach(), fake_GA_heatmap) + self.MSE_loss(real_GB_heatmap.detach(), fake_GB_heatmap))
-            G_paired_cam_loss.backward()
-
-            # Update D and G
+            Discriminator_loss.backward()
             self.D_optim.step()
-            self.G_optim.step()
 
             # Update G
             self.G_optim.zero_grad()
 
-            fake_A2B, fake_A2B_cam_logit, _ = self.genA2B(real_A)
-            fake_B2A, fake_B2A_cam_logit, _ = self.genB2A(real_B)
+            fake_A2B, fake_A2B_cam_logit, real_GA_heatmap = self.genA2B(real_A)
+            fake_B2A, fake_B2A_cam_logit, real_GB_heatmap = self.genB2A(real_B)
 
-            fake_A2B2A, _, _ = self.genB2A(fake_A2B)
-            fake_B2A2B, _, _ = self.genA2B(fake_B2A)
+            fake_A2B2A, _, fake_GB_heatmap = self.genB2A(fake_A2B)
+            fake_B2A2B, _, fake_GA_heatmap = self.genA2B(fake_B2A)
 
             fake_A2A, fake_A2A_cam_logit, _ = self.genB2A(real_A)
             fake_B2B, fake_B2B_cam_logit, _ = self.genA2B(real_B)
@@ -241,7 +234,9 @@ class UGATIT(object) :
             G_loss_A =  self.adv_weight * (G_ad_loss_GA + G_ad_cam_loss_GA + G_ad_loss_LA + G_ad_cam_loss_LA) + self.cycle_weight * G_recon_loss_A + self.identity_weight * G_identity_loss_A + self.cam_weight * G_cam_loss_A + self.pix2pix_weight * G_pix2pix_loss_A
             G_loss_B = self.adv_weight * (G_ad_loss_GB + G_ad_cam_loss_GB + G_ad_loss_LB + G_ad_cam_loss_LB) + self.cycle_weight * G_recon_loss_B + self.identity_weight * G_identity_loss_B + self.cam_weight * G_cam_loss_B + self.pix2pix_weight * G_pix2pix_loss_B
 
-            Generator_loss = G_loss_A + G_loss_B
+            # G paired CAM matching loss
+            G_paired_cam_loss = self.paired_cam_weight*(self.MSE_loss(real_GA_heatmap.detach(), fake_GA_heatmap) + self.MSE_loss(real_GB_heatmap.detach(), fake_GB_heatmap))
+            Generator_loss = G_loss_A + G_loss_B + G_paired_cam_loss
             Generator_loss.backward()
             self.G_optim.step()
 
